@@ -1,0 +1,286 @@
+# Hermes Multi-Agent Setup
+
+Sistema de 4 agentes especializados sobre Hermes Agent + DeepSeek,
+diseñado para minimizar consumo de tokens y mejorar calidad vía
+delegación por subproceso y roles diferenciados.
+
+## Resultados medidos
+
+| Métrica | Agente único | Pipeline 4 agentes | Delta |
+|---|---|---|---|
+| Costo tarea compleja | ~$0.008 | ~$0.010 | +25% |
+| **Calidad de auditoría** | Superficial | **Encuentra bugs críticos** | — |
+| Aislamiento de contexto | Contaminado | Limpio por agente | — |
+| Trazabilidad de costos | Por sesión | Por delegación | — |
+
+El pipeline cuesta ligeramente más que un agente único pero produce
+auditorías 10× más rigurosas y mantiene el contexto del orquestador
+limpio indefinidamente.
+
+## Arquitectura
+
+```
+Usuario
+  │
+  └─→ orquestador (terminal+file)
+        │
+        ├─→ simple   → responde directo
+        │
+        └─→ complejo → ejecuta wrapper slim:
+              │
+              ├─→ investigador-slim (web)                    → hallazgos con URLs
+              ├─→ ejecutor-slim (terminal,file,code_execution) → artefactos probados
+              └─→ revisor-slim (file,terminal)               → auditoría con contraejemplos
+```
+
+Cada delegación corre en **contexto aislado**. El orquestador solo ve
+el stdout final del subagente.
+
+## Hallazgos de diseño
+
+### 1. Presupuesto explícito MEJORA la calidad del output
+
+Contraintuitivo pero verificado empíricamente. Añadimos al revisor:
+
+> Tienes 90 segundos y ~15 llamadas a terminal máximo. Si una prueba
+> se acerca a su límite, córtala.
+
+| Métrica | Revisor sin presupuesto | Revisor con presupuesto |
+|---|---|---|
+| Costo | $0.0042 | $0.0032 (−23%) |
+| Tiempo | 211s | ~110s (−48%) |
+| Muestras pequeñas | 5,000,000 | 200,006 |
+| Muestras grandes | 6,000 | 1,200 |
+| **Hallazgos CRÍTICOS** | **0** | **1** |
+
+El presupuesto forzó al revisor a **priorizar las pruebas más reveladoras**
+(contraejemplo ejecutable) sobre las voluminosas pero redundantes
+(millones de números pequeños). Encontró un bug real que el revisor
+sin límite no detectó.
+
+**Lección generalizable:** sin restricción, un agente LLM diluye su
+esfuerzo. Con restricción, prioriza lo que más información aporta.
+
+### 2. Los tool schemas son el 75% del costo
+
+`hermes prompt-size` revela:
+- System prompt: ~18.9 KB
+- Tool schemas: ~55.9 KB (30 tools)
+- Total: ~14K tokens de peaje fijo por invocación
+
+Restringir con `--toolsets` baja esto a ~3-4K tokens.
+
+### 3. El caché de DeepSeek es fundamental
+
+El peaje fijo se paga una vez. Después, el 95% son cache reads a
+~10% del costo normal. Inversiones en SOUL.md estable se amortizan.
+
+### 4. Los SOUL.md específicos cambian el comportamiento
+
+Sin SOUL.md específico, todos los perfiles son agentes generalistas
+idénticos. El "contrato de rol" en el system prompt es lo que hace
+que un revisor audite y un ejecutor ejecute.
+
+## Prerrequisitos
+
+- Arch Linux (u otra distro con systemd)
+- Hermes Agent v0.19.0+
+- Cuenta de DeepSeek con API key
+- `jq` (`sudo pacman -S jq`)
+- `~/.local/bin` en PATH
+- `uv` instalado
+
+## Instalación
+
+### 1. Crear perfiles
+
+```bash
+hermes profile create orquestador  --description "Clasifica y delega"
+hermes profile create investigador --description "Busca y sintetiza"
+hermes profile create ejecutor     --description "Ejecuta y entrega artefactos"
+hermes profile create revisor      --description "Audita y encuentra bugs"
+```
+
+### 2. Configurar credenciales
+
+Configura el `.env` del orquestador con tu DeepSeek API key:
+
+```bash
+nano ~/.hermes/profiles/orquestador/.env
+# Añadir: DEEPSEEK_API_KEY=sk-...
+```
+
+Copiar a los demás perfiles:
+
+```bash
+for p in ejecutor investigador revisor; do
+  cp ~/.hermes/profiles/orquestador/.env ~/.hermes/profiles/$p/.env
+done
+```
+
+### 3. Fijar modelo
+
+```bash
+for p in orquestador ejecutor investigador revisor; do
+  hermes -p $p config set model.provider deepseek
+  hermes -p $p config set model.default deepseek-chat
+done
+```
+
+### 4. Optimizar prompts
+
+```bash
+for p in orquestador ejecutor investigador revisor; do
+  hermes -p $p config set tools.compact_schemas true   --force
+  hermes -p $p config set skills.prompt_mode    compact --force
+done
+```
+
+### 5. Instalar ddgs en el venv de Hermes
+
+```bash
+VENV_PYTHON=$(readlink -f $(which hermes) | xargs dirname)/python3
+uv pip install --python "$VENV_PYTHON" ddgs
+"$VENV_PYTHON" -c "from ddgs import DDGS; print('ddgs OK')"
+```
+
+### 6. Instalar wrappers
+
+```bash
+mkdir -p ~/.local/bin/hermes-slim
+cp wrappers/*-slim ~/.local/bin/hermes-slim/
+chmod +x ~/.local/bin/hermes-slim/*-slim
+```
+
+### 7. Instalar SOUL.md
+
+```bash
+cp souls/orquestador.md  ~/.hermes/profiles/orquestador/SOUL.md
+cp souls/investigador.md ~/.hermes/profiles/investigador/SOUL.md
+cp souls/ejecutor.md     ~/.hermes/profiles/ejecutor/SOUL.md
+cp souls/revisor.md      ~/.hermes/profiles/revisor/SOUL.md
+```
+
+## Uso
+
+### Modo interactivo
+
+```bash
+~/.local/bin/hermes-slim/orquestador-slim chat
+```
+
+### Modo one-shot (para scripts)
+
+```bash
+~/.local/bin/hermes-slim/orquestador-slim -z "PROMPT" \
+  --usage-file /tmp/usage.json
+```
+
+### Delegación directa
+
+```bash
+~/.local/bin/hermes-slim/ejecutor-slim -z "TAREA: ... CONTEXTO: ... CRITERIO: ..." \
+  --usage-file /tmp/exec.json
+
+jq '{input_tokens, estimated_cost_usd, completed}' /tmp/exec.json
+```
+
+## Auditoría de costos
+
+Cada delegación deja un JSON con:
+
+```json
+{
+  "input_tokens": 1130,
+  "cache_read_tokens": 17138,
+  "total_tokens": 18268,
+  "estimated_cost_usd": 0.0004151952,
+  "api_calls": 3,
+  "completed": true
+}
+```
+
+Sumar costos de un pipeline completo:
+
+```bash
+cat /tmp/hermes-*.json | jq -s '{
+  total_cost: ([.[] | .estimated_cost_usd // 0] | add),
+  total_input: ([.[] | .input_tokens // 0] | add),
+  delegations: length
+}'
+```
+
+## Casos de uso validados
+
+### Caso 1 — Pipeline completo de primalidad
+
+Tarea: investigar el mejor algoritmo para detectar primos hasta 20 dígitos,
+implementarlo, auditarlo.
+
+Resultado:
+- Investigador: Miller-Rabin con 13 bases primas
+- Ejecutor: script probado, 0.34ms por número de 20 dígitos
+- Revisor: encontró bug crítico en la constante de determinismo
+  (con contraejemplo factorizado)
+- Costo total: ~$0.010
+- Tiempo total: ~5 min
+
+### Caso 2 — Delegación simple
+
+Tarea: crear /tmp/test.txt con "hola".
+
+Resultado:
+- Orquestador clasificó como EJECUCIÓN
+- Delegó a ejecutor-slim
+- Resumen final: 3 líneas
+- Costo: ~$0.0009
+
+## Troubleshooting
+
+### "No inference provider configured"
+
+Falta el `.env` del perfil. Copia del orquestador.
+
+### "Venv entry point not found" en hermes doctor
+
+Falso positivo en instalaciones vía pipx/mise. Ignorar.
+
+### "No module named 'ddgs'"
+
+Instalar en el venv específico de Hermes (paso 5). El Python del
+sistema no sirve.
+
+### "hermes config set" no aplica platform_toolsets
+
+Bug conocido: escribe string en lugar de lista. Solución: usar
+wrappers con `--toolsets` explícito.
+
+### DuckDuckGo rate-limita
+
+Considerar SearXNG self-hosted:
+
+```bash
+docker run -d --name searxng -p 8080:8080 searxng/searxng
+echo "SEARXNG_URL=http://localhost:8080" >> ~/.hermes/.env
+hermes config set web.backend searxng
+```
+
+## Referencia rápida
+
+| Comando | Qué hace |
+|---|---|
+| `orquestador-slim chat` | Sesión interactiva |
+| `orquestador-slim -z "..."` | One-shot |
+| `orquestador sessions list` | Listar sesiones |
+| `orquestador sessions export <id>` | Exportar a JSON |
+| `hermes -p <perfil> prompt-size` | Ver system prompt |
+| `hermes doctor` | Diagnóstico |
+
+## Licencia
+
+MIT — úsalo, modifícalo, compártelo.
+
+## Créditos
+
+Construido sobre [Hermes Agent](https://hermes-agent.nousresearch.com)
+de Nous Research.

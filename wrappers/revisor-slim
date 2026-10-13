@@ -1,0 +1,2 @@
+#!/bin/bash
+exec hermes -p revisor --toolsets file,terminal "$@"

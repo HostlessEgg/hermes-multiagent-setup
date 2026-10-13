@@ -1,0 +1,20 @@
+# Secretos y credenciales
+.env
+.env.*
+*.key
+*.secret
+
+# Outputs de ejecución
+*.json
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Sistema
+.DS_Store
+Thumbs.db

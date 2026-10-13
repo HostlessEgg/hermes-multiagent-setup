@@ -1,0 +1,2 @@
+#!/bin/bash
+exec hermes -p ejecutor --toolsets terminal,file,code_execution "$@"
