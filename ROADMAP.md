@@ -38,3 +38,45 @@ la pena el costo extra.
 - Si mejora la calidad de citas y síntesis: migrar
 - Si solo encarece sin mejorar: dejar en chat
 
+
+## Fase 3 — Agente planificador
+
+**Estado:** Pendiente
+**Impacto:** Alto en tareas complejas, nulo en tareas simples
+**Esfuerzo:** Medio
+
+Descompone tareas en subtareas antes de delegar. Vale la pena solo para
+tareas con 3+ pasos interdependientes.
+
+## Fase 4 — Worktree para agentes paralelos
+
+**Estado:** Pendiente
+**Impacto:** Alto si las tareas tocan el mismo repo
+**Esfuerzo:** Bajo
+
+Usar `hermes -w` para correr agentes en paralelo sin colisiones de git.
+
+## Fase 5 — Skills preload por agente
+
+**Estado:** Pendiente
+**Impacto:** Medio
+**Esfuerzo:** Bajo
+
+Preload de skills específicas por perfil con `--skills`.
+
+## Fase 6 — Exploración MCP / A2A
+
+**Estado:** Pendiente (solo si aparece la necesidad)
+**Impacto:** Medio-bajo con el setup actual
+**Esfuerzo:** Alto
+
+MCP permitiría tools externas estandarizadas. A2A sería comunicación
+bidireccional entre agentes — ya cubierto por subprocesos.
+
+## Fase 7 — Hermes kanban
+
+**Estado:** Pendiente
+**Impacto:** Medio
+**Esfuerzo:** Bajo
+
+Tablero multi-perfil nativo de Hermes para coordinación visual.
