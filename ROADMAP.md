@@ -13,28 +13,28 @@ Ideas evaluadas y pendientes de implementar, con análisis de tradeoff.
 - [x] Validación en 2 dominios (programación, ciencias sociales)
 - [x] Ciclo cerrado revisor → ejecutor → revisor
 
-## Fase 2 — Modelos por agente
+## Fase 2 — Modelos por agente ✅ COMPLETADA (2026-10-13)
+
+**Modelos finales:**
+- orquestador: `deepseek-chat`
+- investigador: `deepseek-chat`
+- ejecutor: `deepseek-reasoner`
+- revisor: `deepseek-chat`
+- revisor-deep: `deepseek-reasoner` (perfil nuevo)
+
+**Hallazgos:** documentados en README.md (sección "Hallazgos de Fase 2").
+
+## Fase 2.5 — Evaluar migración de investigador a reasoner
 
 **Estado:** Pendiente
-**Impacto:** Medio-alto
-**Esfuerzo:** Bajo (1 comando por agente)
+**Impacto:** Desconocido
+**Esfuerzo:** Bajo (1 comando + 1 pipeline de prueba)
 
-Cambiar los modelos según el rol:
+**Hipótesis:** el investigador con reasoner podría producir síntesis más
+profundas, pero su rol es leer y citar, no razonar. Probablemente no vale
+la pena el costo extra.
 
-| Agente | Modelo actual | Modelo sugerido | Razón |
-|---|---|---|---|
-| orquestador | deepseek-chat | deepseek-chat | Clasificar no requiere razonamiento profundo |
-| investigador | deepseek-chat | deepseek-chat | Leer y sintetizar es suficiente |
-| ejecutor | deepseek-chat | **deepseek-reasoner** | El razonamiento mejora la calidad del código |
-| revisor | deepseek-chat | **deepseek-reasoner** | El razonamiento mejora la detección de bugs |
+**Criterio de decisión:**
+- Si mejora la calidad de citas y síntesis: migrar
+- Si solo encarece sin mejorar: dejar en chat
 
-**Tradeoff:** `deepseek-reasoner` cuesta ~5-10× más por token. Pero produce
-menos iteraciones porque razona mejor. El costo neto puede ser igual o menor
-en tareas complejas.
-
-**Plan:** Cambiar solo ejecutor y revisor, medir en 2-3 pipelines, decidir.
-
-**Comando:**
-```bash
-hermes -p ejecutor config set model.default deepseek-reasoner
-hermes -p revisor  config set model.default deepseek-reasoner

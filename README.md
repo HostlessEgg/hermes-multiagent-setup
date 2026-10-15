@@ -81,6 +81,67 @@ Sin SOUL.md específico, todos los perfiles son agentes generalistas
 idénticos. El "contrato de rol" en el system prompt es lo que hace
 que un revisor audite y un ejecutor ejecute.
 
+## Modelos por agente
+
+| Agente | Modelo | Rol | Costo típico |
+|---|---|---|---|
+| orquestador | `deepseek-chat` | Clasificar y delegar | ~$0.001 |
+| investigador | `deepseek-chat` | Búsqueda web y síntesis | ~$0.0006 |
+| ejecutor | `deepseek-reasoner` | Código y artefactos | ~$0.0025 |
+| revisor | `deepseek-chat` | Auditoría rutinaria | ~$0.003 |
+| revisor-deep | `deepseek-reasoner` | Auditoría crítica | ~$0.007 |
+
+## Cuándo usar cada revisor
+
+**revisor-slim (chat, económico):**
+- Validar output de tareas simples
+- Verificar formato o completitud
+- Cuando el costo importa más que la exhaustividad
+
+**revisor-deep-slim (reasoner, más caro):**
+- Auditoría de código crítico o correctitud matemática
+- Verificación empírica contra referencias independientes
+- Tareas con seguridad, dinero o datos sensibles
+- Máxima confianza en el veredicto
+
+## Hallazgos de Fase 2
+
+Comparación medida en el caso de primalidad.
+
+### Ejecutor
+
+| Métrica | chat | reasoner | Delta |
+|---|---|---|---|
+| input_tokens | 7,759 | 1,958 | **−75%** |
+| output_tokens | 4,026 | 7,453 | +85% |
+| reasoning_tokens | 0 | 1,956 | nuevo |
+| costo | $0.00228 | $0.00250 | +10% |
+
+**Conclusión:** mismo costo, artefactos más robustos, menos iteraciones.
+El razonamiento previo ahorra input tokens.
+
+### Revisor
+
+| Métrica | chat | reasoner | Delta |
+|---|---|---|---|
+| input_tokens | 10,091 | 11,338 | +12% |
+| output_tokens | 5,307 | 17,156 | +223% |
+| reasoning_tokens | 0 | 10,748 | nuevo |
+| costo | $0.00324 | $0.00678 | +109% |
+
+**Conclusión:** el doble de costo, 10× más verificación (2M casos vs 200K).
+Encontró un error conceptual que el chat no detectó: identificó correctamente
+que `3317044064679887385961981` es el menor pseudoprimo fuerte de las **13**
+bases {2..41}, mientras el chat afirmó erróneamente que era de las **12**
+bases {2..37}. Esa corrección justifica el costo extra para auditorías críticas.
+
+## Tool calling en deepseek-reasoner
+
+Verificado en Hermes v0.19.0: `deepseek-reasoner` soporta function calling
+completo. El ejecutor y el revisor-deep usan `terminal`, `file` y
+`code_execution` sin problemas. `reasoning_tokens` varía entre 0 (tareas
+triviales) y 10,748 (auditorías complejas).
+
 ## Prerrequisitos
 
 - Arch Linux (u otra distro con systemd)
