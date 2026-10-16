@@ -56,13 +56,24 @@ tareas con 3+ pasos interdependientes.
 
 Usar `hermes -w` para correr agentes en paralelo sin colisiones de git.
 
-## Fase 5 — Skills preload por agente
+## Fase 5 — Skills preload por agente ✅ COMPLETADA (2026-10-16)
 
-**Estado:** Pendiente
-**Impacto:** Medio
-**Esfuerzo:** Bajo
+**Skills precargadas por perfil:**
+- investigador: grounded-citations, arxiv, blocked-page-recovery
+- ejecutor: test-driven-development, systematic-debugging, python-debugpy
 
-Preload de skills específicas por perfil con `--skills`.
+**Skills condicionales (via SOUL.md del orquestador):**
+- textual-tui-apps → solo cuando la tarea es de TUI/terminal UI
+
+**Evidencia funcional:**
+- TDD: test escrito antes de implementación, ciclo RED→GREEN real
+- Grounded citations: 6 hallazgos con URLs primarias
+- Textual TUI: confirmada la invocación con `--skills textual-tui-apps`
+
+**Impacto:** +~2,200 tokens en cold start, ~0 en warm cache (amortizado por
+el caché de DeepSeek).
+
+**Documentación completa:** README.md, sección "Skills preload por agente".
 
 ## Fase 6 — Exploración MCP / A2A
 

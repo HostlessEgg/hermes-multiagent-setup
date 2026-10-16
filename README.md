@@ -372,3 +372,53 @@ profundo de documentos, esta limitación es importante.
 **Solución real:** migrar a una instalación soportada de Hermes (no pipx/mise) y
 actualizar a v0.21+. Esa versión incluye el native fetch provider (keyless),
 el keyless ring (Exa/Parallel/Firecrawl/Keenable) y el fix del bug #73192.
+
+## Skills preload por agente (Fase 5)
+
+Cada wrapper puede precargar skills específicas usando `--skills`. Esto reduce
+iteraciones porque el agente ya conoce el dominio antes de empezar.
+
+| Perfil | Skills precargadas | Razón |
+|---|---|---|
+| orquestador | (ninguna) | Solo clasifica y delega |
+| investigador | grounded-citations, arxiv, blocked-page-recovery | Citas verificables + búsqueda académica |
+| ejecutor | test-driven-development, systematic-debugging, python-debugpy | Metodología de código + Python |
+| revisor | (ninguna) | Preload podría sesgar su juicio |
+| revisor-deep | (ninguna) | Igual que el revisor |
+
+### Skills condicionales del orquestador
+
+El orquestador puede añadir skills específicas al invocar al ejecutor, según
+la tarea. Regla implementada en su SOUL.md:
+
+- Tareas de TUI / terminal UI / Textual → añade `--skills textual-tui-apps`
+
+Esto evita el coste permanente de ~400 tokens en cada invocación del ejecutor,
+cargando la skill solo cuando la tarea realmente la necesita.
+
+### Impacto medido
+
+| Agente | Sin skills (cold) | Con skills (cold) | Con skills (warm) |
+|---|---|---|---|
+| Ejecutor | ~1,958 input | ~4,160 input | ~1,573 (TDD task) |
+| Investigador | ~2,850 input | ~3,359 input | ~243 (cached) |
+
+Las skills añaden al **primer** invoke (peaje del system prompt), pero el caché
+de DeepSeek amortiza el costo a partir del segundo. En uso real el sobrecoste
+es marginal.
+
+### Evidencia de que las skills se usan
+
+**TDD (test-driven-development):**
+- El ejecutor escribió el test ANTES de la implementación (`test_suma.py`)
+- Ciclo RED → GREEN real, con evidencia de ambos estados
+- Casos límite cubiertos: negativos, ceros, flotantes, identidad, simetría
+
+**Grounded citations (grounded-citations):**
+- 6 hallazgos, cada uno con URL
+- Fuentes primarias priorizadas (NASA, Wikipedia)
+- Distingue "verificado" de "según snippet"
+
+**Textual TUI (condicional, invocada desde el orquestador):**
+- Confirmada la invocación: `ejecutor-slim -z "..." --skills textual-tui-apps`
+- El ejecutor usó el patrón de la skill (pilot headless, venv con uv, sin eval())
