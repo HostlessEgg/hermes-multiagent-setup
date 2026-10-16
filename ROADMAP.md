@@ -80,3 +80,32 @@ bidireccional entre agentes — ya cubierto por subprocesos.
 **Esfuerzo:** Bajo
 
 Tablero multi-perfil nativo de Hermes para coordinación visual.
+
+## Fase 2.6 — Migrar a instalación soportada
+
+**Estado:** Pendiente
+**Impacto:** Alto (desbloquea extract, native fetch, keyless ring, bug fixes)
+**Esfuerzo:** Medio (backup, reinstalación, verificación)
+
+**Contexto:** la instalación actual vía pipx/mise está deprecada. `hermes update`
+no actualiza el paquete principal (solo las dependencias). Para acceder a las
+versiones nuevas con todas las funcionalidades hay que migrar a un método
+soportado (instalador oficial, AUR, script de migración).
+
+**Beneficios esperados:**
+- `web_extract` funcionando (native fetch keyless)
+- Keyless ring de extract providers (sin API keys)
+- Fix del bug #73192
+- Updates regulares
+
+**Riesgo:** los perfiles actuales (orquestador, investigador, ejecutor, revisor,
+revisor-deep) pueden requerir migración manual. Los SOUL.md y wrappers deberían
+sobrevivir.
+
+**Plan sugerido:**
+1. Backup completo de `~/.hermes` y `~/.local/bin/hermes-slim`
+2. Consultar la doc oficial de platform-support
+3. Elegir el método (AUR o instalador oficial)
+4. Migrar en un entorno de prueba si es posible
+5. Verificar que los 5 perfiles funcionan
+6. Restaurar SOUL.md si hicieron falta

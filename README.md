@@ -345,3 +345,30 @@ MIT — úsalo, modifícalo, compártelo.
 
 Construido sobre [Hermes Agent](https://hermes-agent.nousresearch.com)
 de Nous Research.
+
+## Limitaciones conocidas
+
+### Extracción de URLs (web_extract) no funciona en v0.19.0
+
+**Síntoma:** el investigador puede buscar en web pero no puede leer el contenido
+completo de las URLs.
+
+**Causa raíz:** bug en Hermes v0.19.0 (Issue #73192). El orden de ejecución en
+`tools/web_tools.py` está invertido — `_get_extract_backend()` corre antes que
+`_ensure_web_plugins_loaded()`, así que el registro de backends está vacío y el
+sistema cae al fallback (`web.backend` = ddgs), que es solo búsqueda. El fix está
+en el PR #73183, incluido en versiones más recientes.
+
+**Impacto:** el investigador puede hacer búsquedas web y citar snippets indexados,
+pero no puede leer páginas completas. Para investigación que requiere análisis
+profundo de documentos, esta limitación es importante.
+
+**Workarounds intentados sin éxito:**
+- `web.extract_backend: exa` → requiere EXA_API_KEY
+- `web.extract_backend: parallel` → requiere PARALLEL_API_KEY
+- `web.extract_backend: tavily` → el keyless se añadió en PR #88591 (posterior a v0.19.0)
+- `web.backend: parallel` (fallback) → igual, requiere API key
+
+**Solución real:** migrar a una instalación soportada de Hermes (no pipx/mise) y
+actualizar a v0.21+. Esa versión incluye el native fetch provider (keyless),
+el keyless ring (Exa/Parallel/Firecrawl/Keenable) y el fix del bug #73192.
